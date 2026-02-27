@@ -8,6 +8,10 @@ import nibabel as nib
 import statsmodels.api as sm
 from sklearn.linear_model import LinearRegression
 from brainsmash.mapgen.base import Base
+import fctools
+
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import pandas as pd
 
 # Paths
 projdir = '/home/ln275/f_mc1689_1/multitask_generalization/'
@@ -21,7 +25,7 @@ surfaceDeriv_dir = projdir + 'data/derivatives/surface/'
 subIDs=['02','03','06','08','10','12','14','18','20',
         '22','24','25','26','27','28','29','30','31']
 
-onlyRestSubIdx = [ 0, 1, 3, 4, 6, 7, 8,10,11,
+subjects_subset = [ 0, 1, 3, 4, 6, 7, 8,10,11,
                   12,20,13,21,14,22,15,23,16] # Use when dealing with full subjects' data (n=24)
 
 nSub = len(subIDs)
@@ -33,7 +37,7 @@ nSessions = 2
 nTask = 16
 nTaskCond = 96 # excluding passive tasks and interval timing (auditory task)
 
-TaskCondIdx_subset = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,36,37,38,39,40,
+taskcond_subset = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,36,37,38,39,40,
                       41,42,43,44,45,46,49,50,51,52,53,54,55,56,60,61,62,63,64,65,
                       66,67,68,69,70,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,
                       87,88,89,91,92,93,94,95,96,97,98,99,100,101,102,104,105,106,
@@ -174,16 +178,49 @@ def get_brainsmash_correlation(x,y,n_perm=1000):
         
     return obs_r, pval
  
-def get_residual(X,y):
+
+def get_residual(X, y, compute_vif=True):
+    """
+    Compute residuals after regressing out X from y.
     
+    Parameters:
+    -----------
+    X : array-like, shape (n_samples, n_regressors)
+        Regressor matrix
+    y : array-like, shape (n_samples,)
+        Target variable
+    compute_vif : bool, default=True
+        Whether to compute variance inflation factors
+        
+    Returns:
+    --------
+    coef : array, shape (n_regressors,)
+        Regression coefficients
+    resid : array, shape (n_samples,)
+        Residuals after regression
+    vif_df : DataFrame (optional)
+        VIF values for each regressor (if compute_vif=True)
+    """
+    
+    # Fit the model
     model = LinearRegression()
     model.fit(X, y)
     coef = np.array(model.coef_)
-
-    y_pred = np.dot(coef,X.T)
+    y_pred = np.dot(coef, X.T)
     resid = y - y_pred.T
     
-    return coef,resid
+    # Compute VIF if requested
+    if compute_vif and X.shape[1] > 1:
+        vif_data = pd.DataFrame()
+        vif_data["Regressor"] = [f"X{i}" for i in range(X.shape[1])]
+        vif_data["VIF"] = [variance_inflation_factor(X, i) for i in range(X.shape[1])]
+        
+        print("\nVariance Inflation Factors:")
+        print(vif_data)
+        print(f"\nMulticollinearity warning: VIF > 5 indicates moderate, VIF > 10 indicates severe multicollinearity")
+        
+    
+    return coef, resid
     
 def get_quad_fit(x,y,n_perm=1000):
 
@@ -197,6 +234,8 @@ def get_quad_fit(x,y,n_perm=1000):
     model = sm.OLS(y, X).fit()
     coef = model.params
     n_coef = len(coef)
+    
+    # Brainsmash on quad coef.
     
     null_coef = np.zeros((n_perm,n_coef))
     surrogate_x = get_brainsmash_perm(x,n_perm) # shape:(1000,360)
@@ -213,8 +252,17 @@ def get_quad_fit(x,y,n_perm=1000):
             pval[coef_idx] = (np.sum(null_coef[:,coef_idx] > coef[coef_idx]))/n_perm
         else:
             pval[coef_idx] = (np.sum(null_coef[:,coef_idx] < coef[coef_idx]))/n_perm
+            
+    # AIC comparison with linear
+
+    X_linear = sm.add_constant(x)
+    model_linear = sm.OLS(y, X_linear).fit()
     
-    return coef,pval
+    aic_linear = model_linear.aic
+    aic_quad = model.aic
+    delta_aic = aic_linear - aic_quad
+    
+    return coef,pval,aic_linear,aic_quad,delta_aic 
 
 
 def get_dim_diff():
@@ -255,7 +303,7 @@ def get_obs_RSM():
     with open(subProjDir + 'allsub_taskCond_RSM_activeVisual.pkl', 'rb') as f:
         allsub_taskCondRSM = pickle.load(f)
     
-    select_sub_taskCondRSM = allsub_taskCondRSM[onlyRestSubIdx,:,:,:] # rest data's available only for 18 sub
+    select_sub_taskCondRSM = allsub_taskCondRSM[subjects_subset,:,:,:] # rest data's available only for 18 sub
     
     return select_sub_taskCondRSM
 
@@ -533,3 +581,30 @@ def compute_null_correlations(obs_data,null_data,n_null=1000):
         null_corr[null_idx],_ = stats.pearsonr(null_data[:,null_idx], obs_data)
         
     return null_corr
+
+def get_activity_variance_and_spatial_homogeneity():
+    
+    allsub_temporal_SD = np.zeros((nSub,nParcels))
+    allsub_spatial_SD = np.zeros((nSub,nParcels))
+
+    for subIdx in range(nSub):
+
+        subj = subIDs[subIdx]
+
+        sub_vert_RSdata = fctools.loadrsfMRI(subj,space='vertex')
+
+        for targetroi_idx in range(nParcels):
+
+            target_vert = np.where(glasser == targetroi_idx+1)[0]
+
+            target_vertex_TS = sub_vert_RSdata[target_vert,:]
+
+            allsub_temporal_SD[subIdx,targetroi_idx] = np.mean(np.std(target_vertex_TS, axis=1))
+            allsub_spatial_SD[subIdx,targetroi_idx] = np.mean(np.std(target_vertex_TS, axis=0))
+
+    meansub_temporal_SD = np.mean(allsub_temporal_SD, axis=0)
+    meansub_spatial_SD = np.mean(allsub_spatial_SD, axis=0)
+        
+    return meansub_temporal_SD, meansub_spatial_SD
+    
+    

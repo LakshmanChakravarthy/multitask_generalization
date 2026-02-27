@@ -21,15 +21,17 @@ helpfiles_dir = projdir + 'docs/experimentfiles/'
 
 
 # Params
+nSub=18
 nParcels = 360
-nNetwork = 12
-networkdef = np.loadtxt(helpfiles_dir + 'cortex_parcel_network_assignments.txt')
+nNetwork = 13
+networkdef = np.loadtxt(helpfiles_dir + 'cortex_parcel_network_assignments_separate_motor.txt')
+
 
 # Following colors closest to 'magma' palette
 color1, color2, color3 = clrs.to_rgba('indigo'),clrs.to_rgba('mediumvioletred'),clrs.to_rgba('coral')
 
 sensorynets = [1,2]
-associationnets = [4,5,6,7,8,9,10,11,12]
+associationnets = [4,5,6,7,8,9,10,11,12,13]
 motornets =[3]
 
 tmp = {}
@@ -58,10 +60,44 @@ for roi in range(nParcels):
     roiColorsByNetwork.append(tmp[roi])
 roiColorsByNetwork = np.array(roiColorsByNetwork)
 
+# Differentiating 13 networks
+
+# networkNames = ['VIS1','VIS2','SMN','CON','DAN','LAN','FPN','AUD','DMN','PMULTI','VMM','ORA']
+networkNames = ['VIS1','VIS2','SMN-Fr','CON','DAN','LAN','FPN','AUD','DMN','PMULTI','VMM','ORA','SMN-Par']
+networkpalette = np.array(['royalblue', 'slateblue', 'paleturquoise', 'darkorchid', 
+                           'limegreen', 'lightseagreen', 'yellow', 'orchid', 'r', 
+                           'peru', 'orange', 'olivedrab', 'teal'])
+
+# Map each ROI to its network's color
+allnet_roiColorsByNetwork = np.array([
+    clrs.to_rgb(networkpalette[int(networkdef[roi]) - 1]) 
+    for roi in range(nParcels)
+])
+
+# If you need the network IDs
+allnet_roi_id = networkdef.copy()
+
 # # Set the style for the plot
 # plt.style.use('seaborn-v0_8-whitegrid')
 # sns.set_context("talk", font_scale=1.5)  # Increased font scale from 1.5 to 2.0 and context to "talk"
 
+def get_network_definition_brain_plot():
+
+    # Create a discrete colormap from your network colors
+    network_colors_rgb = [clrs.to_rgb(c) for c in networkpalette]
+    discrete_cmap = clrs.ListedColormap(network_colors_rgb)
+
+    # Your input data is just the network assignment for each parcel
+    inputdata_mapped = networkdef - 1  # 0-indexed network IDs for each of 360 parcels
+
+    wbplot.pscalar(
+        file_out=figoutdir + 'network_definition_brain_plot' + '.png',
+        pscalars=inputdata_mapped,
+        vrange=(0, len(networkNames) - 1),  # 0 to 12 for your 13 networks
+        cmap=discrete_cmap,
+        transparent=True
+    )
+    
 
 def get_brain_plot(inputdata,file_out,title,colormap=None,ignore_unvalid=False):
 
@@ -74,6 +110,7 @@ def get_brain_plot(inputdata,file_out,title,colormap=None,ignore_unvalid=False):
         mask_valid_regions = inputdata != -9999
         min_inputdata = np.min(inputdata[mask_valid_regions])
     else:
+        mask_valid_regions = inputdata
         min_inputdata = np.min(inputdata)
     
   
@@ -140,26 +177,18 @@ def customScatterPlot(X,Y,RAaxis,xlabel,ylabel,outname,legLoc,xmin,xmax,ymin,yma
         Xselect = X
         Yselect = Y
         colorsSelect = allnet_roiColorsByNetwork
-    elif RAaxis == 'full_BS':
-        Xselect = X
-        Yselect = Y
-        colorsSelect = roiColorsByNetwork
-    elif RAaxis == 'full_BS_custom':
-        Xselect = X[custom_select]
-        Yselect = Y[custom_select]
-        colorsSelect = roiColorsByNetwork[custom_select]
     elif RAaxis == 'onlysensory':
         Xselect = X[sensory_roi_id]
         Yselect = Y[sensory_roi_id]
-        colorsSelect = roiColorsByNetwork[sensory_roi_id]
+        colorsSelect = allnet_roiColorsByNetwork[sensory_roi_id]
     elif RAaxis == 'onlyassociation':
         Xselect = X[association_roi_id]
         Yselect = Y[association_roi_id]
-        colorsSelect = roiColorsByNetwork[association_roi_id]
+        colorsSelect = allnet_roiColorsByNetwork[association_roi_id]
     elif RAaxis == 'onlymotor':
         Xselect = X[motor_roi_id]
         Yselect = Y[motor_roi_id]
-        colorsSelect = roiColorsByNetwork[motor_roi_id]
+        colorsSelect = allnet_roiColorsByNetwork[motor_roi_id]
     
     
     fig, ax = plt.subplots(figsize=(plotwidth,5))
@@ -185,8 +214,8 @@ def customScatterPlot(X,Y,RAaxis,xlabel,ylabel,outname,legLoc,xmin,xmax,ymin,yma
 
     if showstat==True: 
         
-        rho, p = stats.pearsonr(Xselect,Yselect)
-        rho = round(rho,2)
+        r, p = stats.pearsonr(Xselect,Yselect)
+        r = round(r,2)
 
         if legLoc == 'TL':
             legX,legY = 0.075,0.85     
@@ -197,7 +226,7 @@ def customScatterPlot(X,Y,RAaxis,xlabel,ylabel,outname,legLoc,xmin,xmax,ymin,yma
         elif legLoc == 'BR':
             legX,legY = 0.55,0.1
 
-        plt.annotate(r'$r$'+ ' = ' + str(rho),
+        plt.annotate(r'$r$'+ ' = ' + str(r),
                      xy=(legX,legY),fontsize=28,xycoords='axes fraction')
         # plt.annotate(r'$p$'+ ' = ' + "{:.2e}".format(p),
         #              xy=(legX,legY-0.05),fontsize=28,xycoords='axes fraction')
@@ -208,7 +237,7 @@ def customScatterPlot(X,Y,RAaxis,xlabel,ylabel,outname,legLoc,xmin,xmax,ymin,yma
     if outname:
         plt.savefig(outname,transparent=True)
         
-    return fig
+    return fig,r,p
         
 
 # Function to create the visualization
@@ -349,3 +378,222 @@ def plot_null_hist(obs_value, null_hist_data, xlabel, title):
     plt.savefig(figoutdir + title + '.pdf',transparent=True)
 
     return fig
+
+def allNetsBoxPlot(Y1, Y2, ylabel, xlabel, xmin=None, xmax=None, ymin=None, ymax=None, 
+                   networklist=range(1, 14), Y2_is_gradient=True, pc_idx=0, plotwidth=5.75):
+    """
+    Create box plots for network-averaged metrics with x-positions determined by another metric.
+    
+    Parameters:
+    -----------
+    Y1 : array-like
+        Primary metric values for y-axis (shape: n_subjects x n_regions)
+    Y2 : array-like
+        Metric for x-positioning. Either:
+        - If Y2_is_gradient=True: gradient loadings (shape: n_regions x n_pcs)
+        - If Y2_is_gradient=False: subject-wise values (shape: n_subjects x n_regions)
+    ylabel : str
+        Label for y-axis
+    xlabel : str
+        Label for x-axis
+    xmin, xmax, ymin, ymax : float, optional
+        Axis limits
+    networklist : list or range, default=range(1, 14)
+        List of network indices to plot (1-13, where 13 is SMN-Par)
+    Y2_is_gradient : bool, default=True
+        Whether Y2 is gradient loadings (True) or subject-wise metric (False)
+    pc_idx : int, default=0
+        Which principal component to use if Y2_is_gradient=True
+    plotwidth : float, default=5.75
+        Width of the figure
+    """
+    
+    metricAllNets_Y1 = returnNetworkAverages(Y1, networklist)
+    
+    if Y2_is_gradient:
+        metricAllNets_Y2 = None
+    else:
+        metricAllNets_Y2 = returnNetworkAverages(Y2, networklist)
+    
+    # Calculate x-positions and collect data
+    x_positions = []
+    network_labels = []
+    network_colors = []
+    
+    for netw in networklist:
+        thisNetROIs = np.where(networkdef == netw)[0]
+        
+        network_labels.append(networkNames[netw - 1])
+        network_colors.append(networkpalette[netw - 1])
+        
+        if Y2_is_gradient:
+            x_positions.append(np.mean(Y2[thisNetROIs, pc_idx]))
+        else:
+            x_positions.append(np.mean(Y2[:, thisNetROIs]))
+    
+    # Build dataframe
+    df_list = []
+    for netwIdx, netw in enumerate(networklist):
+        thisNetROIs = np.where(networkdef == netw)[0]
+        
+        for subIdx in range(nSub):
+            df_list.append({
+                'Y1value': metricAllNets_Y1[subIdx, netwIdx],
+                'Y2value': metricAllNets_Y2[subIdx, netwIdx] if not Y2_is_gradient else x_positions[netwIdx],
+                'group_by': network_labels[netwIdx],
+                'x_pos': x_positions[netwIdx],
+                'color': network_colors[netwIdx]
+            })
+    
+    df = pd.DataFrame(df_list)
+    
+    # Sort by x_position for proper ordering
+    df_sorted = df.sort_values('x_pos')
+    order = df_sorted['group_by'].unique()
+    x_pos_dict = dict(zip(network_labels, x_positions))
+    color_dict = dict(zip(network_labels, network_colors))
+    
+    # Create plot with matching figure size
+    fig, ax = plt.subplots(figsize=(plotwidth, 5))
+    
+    # Determine x-axis range
+    if Y2_is_gradient:
+        x_min = np.min(Y2[:, pc_idx])
+        x_max = np.max(Y2[:, pc_idx])
+    else:
+        x_min = np.min(Y2)
+        x_max = np.max(Y2)
+    
+    full_range = x_max - x_min
+    box_width = full_range / 40
+    
+    # Box plots at computed positions
+    bp = ax.boxplot(
+        [df[df['group_by'] == net]['Y1value'].values for net in order],
+        positions=[x_pos_dict[net] for net in order],
+        widths=box_width,
+        patch_artist=True,
+        showfliers=False,
+        whis=[2.5, 97.5]
+    )
+    
+    # Color boxes and set line widths
+    for patch, net in zip(bp['boxes'], order):
+        patch.set_facecolor(color_dict[net])
+        patch.set_alpha(0.6)  # Match scatter plot alpha
+        patch.set_linewidth(2)
+    
+    # Thicker whiskers, caps, and medians
+    for whisker in bp['whiskers']:
+        whisker.set_linewidth(2)
+    for cap in bp['caps']:
+        cap.set_linewidth(2)
+    for median in bp['medians']:
+        median.set_linewidth(2.5)
+        median.set_color('black')
+    
+    # Add strip plot with matching scatter style
+    for net in order:
+        net_data = df[df['group_by'] == net]
+        jitter_amount = box_width * 0.3
+        x_jitter = np.random.normal(x_pos_dict[net], jitter_amount, len(net_data))
+        ax.scatter(x_jitter, net_data['Y1value'], 
+                  alpha=0.6, s=70, color=color_dict[net], zorder=0, edgecolor='none')
+    
+    # Calculate means
+    means_df = df.groupby('group_by', sort=False)['Y1value'].mean().reindex(order)
+    mean_x = [x_pos_dict[net] for net in order]
+        
+    # Styling to match customScatterPlot
+    plt.xlabel(xlabel, fontsize=28)
+    plt.ylabel(ylabel, fontsize=28)
+    plt.locator_params(axis='y', nbins=4)
+    plt.locator_params(axis='x', nbins=3)
+    plt.xticks(fontsize=28)
+    plt.yticks(fontsize=28)
+    
+    # Set axis limits
+    if xmin is not None and xmax is not None:
+        plt.xlim(xmin, xmax)
+    else:
+        padding = full_range / 20
+        ax.set_xlim(np.min(mean_x) - padding, np.max(mean_x) + padding)
+    
+    if ymin is not None and ymax is not None:
+        plt.ylim(ymin, ymax)
+        
+    # Format x-tick labels to 2 decimal places
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.2f}'))
+    
+    ax.xaxis.set_tick_params(width=4)
+    ax.yaxis.set_tick_params(width=4)
+    
+    # Match despine and tight_layout order
+    sns.despine()
+    plt.tight_layout()
+    
+    # Create legend with network names and colors
+    legend_elements = [plt.Line2D([0], [0], marker='s', color='w', 
+                                  markerfacecolor=color_dict[net], markersize=10, 
+                                  label=net, markeredgewidth=0) 
+                      for net in order]
+    ax.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1, 0.5), 
+              frameon=False, fontsize=12)
+    
+    plt.savefig(figoutdir + ylabel + '_vs_' + xlabel + '_AllNetworksBoxPlot.pdf', 
+                transparent=True, bbox_inches='tight')
+    
+    return fig, ax, df
+
+
+def returnNetworkAverages(metric,networklist): 
+
+    metricAllNets = np.zeros((nSub,len(networklist)))
+    for subIdx in range(nSub):
+        for netwIdx,netw in enumerate(networklist):
+            # if netw == 2:
+            #     metricAllNets[subIdx,netwIdx] = np.mean(metric[subIdx,np.where((networkdef==1) |(networkdef==2))[0]])
+            # else:
+            metricAllNets[subIdx,netwIdx] = np.mean(metric[subIdx,np.where(networkdef==netw)[0]])
+
+    return metricAllNets
+
+
+def create_network_legend(network_names, network_colors, **kwargs):
+    """
+    Create a standalone legend with colored dots and labels.
+    
+    Parameters:
+    -----------
+    network_names : list or array
+        Labels for each network
+    network_colors : list or array
+        Matplotlib color names corresponding to each network
+    **kwargs : optional
+        Additional arguments passed to plt.legend()
+        Common options: ncol, fontsize, frameon, loc, bbox_to_anchor
+    
+    Returns:
+    --------
+    fig, ax : matplotlib figure and axis objects
+    """
+    # Create legend handles
+    handles = [mpatches.Patch(color=color, label=name) 
+               for name, color in zip(network_names, network_colors)]
+    
+    # Create figure with legend only
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.axis('off')
+    
+    # Default legend parameters (can be overridden by kwargs)
+    legend_params = {
+        'ncol': 2,
+        'fontsize': 10,
+        'frameon': True,
+        'loc': 'center'
+    }
+    legend_params.update(kwargs)
+    
+    ax.legend(handles=handles, **legend_params)
+    
+    return fig, ax
