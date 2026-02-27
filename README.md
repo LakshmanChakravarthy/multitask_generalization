@@ -10,7 +10,7 @@ This repository includes cleaned, modular code for analyzing functional connecti
 - lakastro@gmail.com
 - michael.cole@rutgers.edu
 
-**Last Updated**: [Current Date]
+**Last Updated**: Feb 26, 2026
 
 ---
 
