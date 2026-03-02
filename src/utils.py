@@ -8,7 +8,7 @@ import nibabel as nib
 import statsmodels.api as sm
 from sklearn.linear_model import LinearRegression
 from brainsmash.mapgen.base import Base
-import fctools
+import data_utils
 
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import pandas as pd
@@ -591,7 +591,7 @@ def get_activity_variance_and_spatial_homogeneity():
 
         subj = subIDs[subIdx]
 
-        sub_vert_RSdata = fctools.loadrsfMRI(subj,space='vertex')
+        sub_vert_RSdata = data_utils.loadrsfMRI(subj,space='vertex')
 
         for targetroi_idx in range(nParcels):
 
