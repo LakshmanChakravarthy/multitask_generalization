@@ -18,7 +18,7 @@ This repository includes cleaned, modular code for analyzing functional connecti
 
 This code analyzes the publicly available **Multi-Domain Task Battery (MDTB)** dataset:
 
-**OpenNeuro Repository**: https://openneuro.org/datasets/ds002105
+**OpenNeuro Repository**: [https://openneuro.org/datasets/ds002105](https://openneuro.org/datasets/ds002105/versions/1.1.0)
 
 **Dataset Citation**: King, M., Hernandez-Castillo, C.R., Poldrack, R.A., Ivry, R.B., Diedrichsen, J., 2019. Functional boundaries in the human cerebellum revealed by a multi-domain task battery. *Nature Neuroscience* 22, 1371–1378. https://doi.org/10.1038/s41593-019-0436-x
 
