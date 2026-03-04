@@ -491,7 +491,7 @@ This directory contains the core, reusable modules that implement the analysis p
 - **`notebooks/`**: Jupyter notebooks that generate figure panels from processed derivative data and perform additional analyses discussed in the main text and supplement. Example derivative data for initial analyses of the very first notebook (Figure2) is added in example_derivatives subdirectory. But to preserve the modular code structure (which needs wide variety of data that can't be compressed for the repository), it is recommended to use the source code to generate all the necessary derivatives needed
 - **`scripts/`**: Python scripts for running analyses on processed data and generating derivative outputs
 
-**Note**: Not all derivative data for supplementary figures is included in the repository due to file size constraints, but can be generated using the source code. However, all code required to generate derivative data from preprocessed fMRI is included.
+**Note**: Not all derivative data for supplementary figures is included in the repository due to file size constraints, but can be generated using the source code. However, all code required to generate derivative data from preprocessed fMRI is included. Runtime of most of the analyses on multiple CPU cores is fairly quick (under an hour), except for vertexwise FC computation, surface inhomogeneity and permutation analyses, which may take few hours, depending on the compute.
 
 
 ---
