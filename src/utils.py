@@ -606,5 +606,67 @@ def get_activity_variance_and_spatial_homogeneity():
     meansub_spatial_SD = np.mean(allsub_spatial_SD, axis=0)
         
     return meansub_temporal_SD, meansub_spatial_SD
+
+def get_temporalSNR():
     
+    allsub_temporal_SNR = np.zeros((nSub,nParcels))
+
+    for subIdx in range(nSub):
+
+        subj = subIDs[subIdx]
+
+        sub_vert_RSdata = data_utils.loadrsfMRI(subj,space='vertex',retain_mean=True)
+
+        for targetroi_idx in range(nParcels):
+
+            target_vert = np.where(glasser == targetroi_idx+1)[0]
+
+            target_vertex_TS = sub_vert_RSdata[target_vert,:]
+            
+            target_vertex_mean = np.mean(target_vertex_TS, axis=1)
+            target_vertex_SD = np.std(target_vertex_TS, axis=1)
+            
+            allsub_temporal_SNR[subIdx,targetroi_idx] = np.mean(target_vertex_mean/target_vertex_SD)
+
+    meansub_temporal_SNR = np.mean(allsub_temporal_SNR, axis=0)
+        
+    return meansub_temporal_SNR
+    
+def get_task_condition_SNR():
+    
+    projdir = '/home/ln275/f_mc1689_1/multitask_generalization/'
+    subProjDir = projdir + 'data/derivatives/RSM_ActFlow/'
+    
+    TaskCondIdx_subset = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,36,37,38,39,40,
+                          41,42,43,44,45,46,49,50,51,52,53,54,55,56,60,61,62,63,64,65,
+                          66,67,68,69,70,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,
+                          87,88,89,91,92,93,94,95,96,97,98,99,100,101,102,104,105,106,
+                          107,108,109,110,111,112,113,114,115,120,121,122,123,124,125])
+    
+    with open(subProjDir + 'allSubTaskCondBetas.pkl', 'rb') as f:
+        allSubTaskBetas = pickle.load(f)
+    
+    # Select subjects and task conditions; average across sessions
+    # Shape: (18, 2, 96, 91282) -> mean over sessions -> (18, 96, 91282)
+    selectsub_betas = allSubTaskBetas[subjects_subset, :, :, :][:, :, TaskCondIdx_subset, :]
+    betas_meansess = np.mean(selectsub_betas, axis=1)
+    
+    allsub_task_SNR = np.zeros((nSub, nParcels))
+    
+    for subIdx in range(nSub):
+        for roiIdx in range(nParcels):
+            
+            target_vert = np.where(glasser == roiIdx + 1)[0]
+            
+            # Shape: (96, n_vertices_in_parcel)
+            target_vertex_betas = betas_meansess[subIdx, :, target_vert]
+            
+            vertex_mean = np.mean(target_vertex_betas, axis=0)  # mean across 96 conditions
+            vertex_sd   = np.std(target_vertex_betas, axis=0)   # SD across 96 conditions
+            
+            allsub_task_SNR[subIdx, roiIdx] = np.mean(vertex_mean / vertex_sd)
+    
+    meansub_task_SNR = np.mean(allsub_task_SNR, axis=0)
+    
+    return meansub_task_SNR
     

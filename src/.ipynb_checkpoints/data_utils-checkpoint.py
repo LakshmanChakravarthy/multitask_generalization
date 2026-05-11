@@ -7,52 +7,48 @@ This module provides functions to load subject data in different spaces
 
 import numpy as np
 import nibabel as nib
+import h5py
 
+projdir = '/home/ln275/f_mc1689_1/multitask_generalization/'
+preprocessed_data = projdir + 'data/derivatives/postprocessing/'
 
-def load_rsfmri(subject_id, space='vertex', data_dir=None):
+def loadrsfMRI(subj,space='parcellated',atlas='glasser',retain_mean=False):
     """
-    Load resting-state fMRI data for a subject.
-    
-    Parameters
-    ----------
-    subject_id : str
-        Subject identifier (e.g., '02', '03', etc.)
-    space : str, default='vertex'
-        Data space to load. Options: 'vertex', 'parcellated'
-    data_dir : str, optional
-        Base directory containing the data. If None, uses default project directory.
-        
-    Returns
-    -------
-    data : ndarray
-        Loaded fMRI data
-        - If space='vertex': shape (n_vertices, n_timepoints)
-        - If space='parcellated': shape (n_parcels, n_timepoints)
-        
-    Raises
-    ------
-    ValueError
-        If space is not 'vertex' or 'parcellated'
+    Load in resting-state residuals
     """
-    
-    if space not in ['vertex', 'parcellated']:
-        raise ValueError(f"Invalid space '{space}'. Must be 'vertex' or 'parcellated'")
-    
-    # Set default data directory if not provided
-    if data_dir is None:
-        data_dir = '/home/ln275/f_mc1689_1/multitask_generalization/data/'
-    
-    # Construct file path based on space
+    runs = ['bold9','bold10']
     if space == 'vertex':
-        # Load vertex-level data (surface space)
-        filepath = f"{data_dir}/sub-{subject_id}/func/sub-{subject_id}_task-rest_space-fsLR32k_bold.dtseries.nii"
-        data = nib.load(filepath).get_fdata().T  # Transpose to (vertices, time)
-        
+        atlas_str = ''
     elif space == 'parcellated':
-        # Load parcellated data (Glasser parcels)
-        filepath = f"{data_dir}/sub-{subject_id}/func/sub-{subject_id}_task-rest_space-Glasser360_bold.ptseries.nii"
-        data = nib.load(filepath).get_fdata().T  # Transpose to (parcels, time)
+        if atlas=='glasser':
+            atlas_str = ''
+        elif atlas=='schaefer':
+            atlas_str = '_' + atlas 
+        elif atlas=='gordon':
+            atlas_str = '_' + atlas 
+
+    data = []
     
+    if retain_mean:
+        suffix = '_mean_retained'
+    else:
+        suffix = ''
+    
+    for run in runs:
+        try:
+            h5f = h5py.File(preprocessed_data + 'rest_'+space+'_data' + suffix + '/' +  subj + '_b2_rsfMRI' + atlas_str + '_' + space + '_qunex_' + run + suffix + '.h5','r')
+            
+            ts = h5f['residuals'][:].T
+            data.extend(ts)
+            h5f.close()
+        except:
+            print('Subject', subj, '| run', run, ' does not exist... skipping')
+
+    try:
+        data = np.asarray(data).T
+    except:
+        print('\tError')
+
     return data
 
 
